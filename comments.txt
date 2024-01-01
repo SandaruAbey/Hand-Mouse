@@ -1,0 +1,73 @@
+import cv2
+import mediapipe as mp
+import pyautogui
+
+# Open the webcam
+cap = cv2.VideoCapture(0)
+
+# Initialize Mediapipe Hands module for hand detection
+hand_detector = mp.solutions.hands.Hands()
+drawing_utils = mp.solutions.drawing_utils
+
+# Get the screen size for mapping hand coordinates to screen coordinates
+screen_width, screen_height = pyautogui.size()
+index_y = 0
+
+# Main loop to continuously process video frames
+while True:
+    # Read a frame from the webcam
+    _, frame = cap.read()
+
+    # Flip the frame horizontally for a mirrored view
+    frame = cv2.flip(frame, 1)
+
+    # Get frame dimensions
+    frame_height, frame_width, _ = frame.shape
+
+    # Convert the frame from BGR to RGB
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # Process the frame to detect hands
+    output = hand_detector.process(rgb_frame)
+    hands = output.multi_hand_landmarks
+
+    # If hands are detected
+    if hands:
+        for hand in hands:
+            # Draw landmarks on the detected hand
+            drawing_utils.draw_landmarks(frame, hand)
+            
+            # Extract landmark coordinates for each hand
+            landmarks = hand.landmark
+            for id, landmark in enumerate(landmarks):
+                x = int(landmark.x * frame_width)
+                y = int(landmark.y * frame_height)
+
+                # Moving the mouse cursor with index finger (landmark id 8)
+                if id == 8:
+                    cv2.circle(img=frame, center=(x, y), radius=10, color=(0, 255, 255))
+                    index_x = screen_width / frame_width * x
+                    index_y = screen_height / frame_height * y
+                    pyautogui.moveTo(index_x, index_y)
+
+                # Perform a click action if thumb (landmark id 4) is close to the index finger
+                if id == 4:
+                    cv2.circle(img=frame, center=(x, y), radius=10, color=(0, 255, 255))
+                    thumb_x = screen_width / frame_width * x
+                    thumb_y = screen_height / frame_height * y
+                    print('Distance between fingers:', abs(index_y - thumb_y))
+                    if abs(index_y - thumb_y) < 20:
+                        # Perform a click action using pyautogui
+                        pyautogui.click()
+                        pyautogui.sleep(1)  # Sleep for 1 second to prevent multiple clicks
+
+    # Display the frame with overlays
+    cv2.imshow('Virtual Mouse', frame)
+
+    # Check for 'q' key press to exit the loop
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release the webcam and close OpenCV windows
+cap.release()
+cv2.destroyAllWindows()
